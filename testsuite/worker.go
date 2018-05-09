@@ -24,7 +24,7 @@ func (exe *Worker) Start() {
 	simulateWork(exe.WorkStart, exe.SleepStart)
 }
 
-func (exe *Worker) Include(v Argument) {
+func (exe *Worker) Include(v interface{}) {
 	exe.Total += v.(int64)
 	simulateWork(exe.WorkInclude, exe.SleepInclude)
 }

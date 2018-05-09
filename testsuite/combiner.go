@@ -1,7 +1,7 @@
 package testsuite
 
 type Combiner interface {
-	Do(op Argument)
+	Do(op interface{})
 }
 
 type Runner interface {
@@ -12,16 +12,14 @@ type Runner interface {
 
 type AsyncCombiner interface {
 	Combiner
-	DoAsync(op Argument)
+	DoAsync(op interface{})
 }
 
 type Batcher interface {
 	Start()
-	Include(op Argument)
+	Include(op interface{})
 	Finish()
 }
-
-type Argument interface{}
 
 // Other possible designs
 //   1. Include(v interface)
