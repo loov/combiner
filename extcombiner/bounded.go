@@ -5,7 +5,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// Bounded is a bounded non-spinning combiner queue
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type Bounded struct {
 	head    unsafe.Pointer // *boundedNode
 	_       [7]uint64
@@ -19,6 +21,7 @@ type boundedNode struct {
 	argument interface{}
 }
 
+// NewBounded creates a Bounded queue.
 func NewBounded(batcher Batcher, limit int) *Bounded {
 	return &Bounded{
 		batcher: batcher,
@@ -31,6 +34,7 @@ var boundedLockedElem = boundedNode{}
 var boundedLockedNode = &boundedLockedElem
 var boundedLocked = (unsafe.Pointer)(boundedLockedNode)
 
+// Do passes value to Batcher and waits for completion
 func (c *Bounded) Do(arg interface{}) {
 	node := &boundedNode{argument: arg}
 

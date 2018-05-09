@@ -5,7 +5,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BoundedUintptr is a bounded spinning combiner queue using uintptr internally
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BoundedUintptr struct {
 	head    uintptr // *boundedUintptrNode
 	_       [7]uint64
@@ -18,6 +20,7 @@ type boundedUintptrNode struct {
 	argument interface{}
 }
 
+// NewBoundedUintptr creates a BoundedUintptr queue.
 func NewBoundedUintptr(batcher Batcher, limit int) *BoundedUintptr {
 	return &BoundedUintptr{
 		batcher: batcher,
@@ -31,6 +34,7 @@ const (
 	boundedUintptrHandoffTag = uintptr(2)
 )
 
+// Do passes value to Batcher and waits for completion
 func (c *BoundedUintptr) Do(arg interface{}) {
 	node := &boundedUintptrNode{argument: arg}
 

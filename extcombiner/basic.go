@@ -5,7 +5,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// Basic is an unbounded spinning combiner queue
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type Basic struct {
 	head    unsafe.Pointer // *basicNode
 	_       [7]uint64
@@ -17,6 +19,7 @@ type basicNode struct {
 	argument interface{}
 }
 
+// NewBasic creates a Basic queue.
 func NewBasic(batcher Batcher) *Basic {
 	return &Basic{
 		batcher: batcher,
@@ -28,8 +31,11 @@ var basicLockedElem = basicNode{}
 var basicLockedNode = &basicLockedElem
 var basicLocked = (unsafe.Pointer)(basicLockedNode)
 
+// DoAsync passes value to Batcher without waiting for completion
 func (c *Basic) DoAsync(op interface{}) { c.do(op, true) }
-func (c *Basic) Do(op interface{})      { c.do(op, false) }
+
+// Do passes value to Batcher and waits for completion
+func (c *Basic) Do(op interface{}) { c.do(op, false) }
 
 func (c *Basic) do(op interface{}, async bool) {
 	node := &basicNode{argument: op}

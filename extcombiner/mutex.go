@@ -6,17 +6,22 @@ import (
 	"sync/atomic"
 )
 
+// Mutex is a combiner queue that uses mutex to serialize operations.
+//
+// Not recommended, only for comparison.
 type Mutex struct {
 	mu      sync.Mutex
 	batcher Batcher
 }
 
+// NewMutex creates a combiner queue based on a mutex.
 func NewMutex(batcher Batcher) *Mutex {
 	c := &Mutex{}
 	c.batcher = batcher
 	return c
 }
 
+// Do passes value to Batcher and waits for completion
 func (c *Mutex) Do(v interface{}) {
 	c.mu.Lock()
 	c.batcher.Start()
@@ -25,17 +30,22 @@ func (c *Mutex) Do(v interface{}) {
 	c.mu.Unlock()
 }
 
+// SpinMutex is a combiner queue that uses a spinning mutex to serialize operations.
+//
+// Not recommended, only for comparison.
 type SpinMutex struct {
 	mu      spinmutex
 	batcher Batcher
 }
 
+// NewSpinMutex creates a combiner queue based on a spin mutex.
 func NewSpinMutex(batcher Batcher) *SpinMutex {
 	c := &SpinMutex{}
 	c.batcher = batcher
 	return c
 }
 
+// Do passes value to Batcher and waits for completion
 func (c *SpinMutex) Do(v interface{}) {
 	c.mu.Lock()
 	c.batcher.Start()

@@ -2,6 +2,7 @@ package extcombiner
 
 import "github.com/loov/combiner/testsuite"
 
+// All contains all combiner queue descriptions
 var All = testsuite.Descs{
 	{"Mutex", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewMutex(bat) }},
 	{"SpinMutex", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewSpinMutex(bat) }},

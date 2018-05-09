@@ -7,7 +7,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BasicSleepy is an unbounded non-spinning combiner queue
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BasicSleepy struct {
 	head    unsafe.Pointer // *basicSleepyNode
 	_       [7]uint64
@@ -22,6 +24,7 @@ type basicSleepyNode struct {
 	next     unsafe.Pointer // *basicSleepyNode
 }
 
+// NewBasicSleepy creates a BasicSleepy queue.
 func NewBasicSleepy(batcher Batcher) *BasicSleepy {
 	c := &BasicSleepy{
 		batcher: batcher,
@@ -35,8 +38,11 @@ var basicSleepyLockedElem = basicSleepyNode{}
 var basicSleepyLockedNode = &basicSleepyLockedElem
 var basicSleepyLocked = (unsafe.Pointer)(basicSleepyLockedNode)
 
+// DoAsync passes value to Batcher without waiting for completion
 func (c *BasicSleepy) DoAsync(op interface{}) { c.do(op, true) }
-func (c *BasicSleepy) Do(op interface{})      { c.do(op, false) }
+
+// Do passes value to Batcher and waits for completion
+func (c *BasicSleepy) Do(op interface{}) { c.do(op, false) }
 
 func (c *BasicSleepy) do(op interface{}, async bool) {
 	node := &basicSleepyNode{argument: op}

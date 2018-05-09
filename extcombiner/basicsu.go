@@ -7,7 +7,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BasicSleepyUintptr is an unbounded non-spinning combiner queue using uintptr internally
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BasicSleepyUintptr struct {
 	head    uintptr // *basicSleepyUintptrNode
 	_       [7]uint64
@@ -22,6 +24,7 @@ type basicSleepyUintptrNode struct {
 	argument interface{}
 }
 
+// NewBasicSleepyUintptr creates a BasicSleepyUintptr queue.
 func NewBasicSleepyUintptr(batcher Batcher) *BasicSleepyUintptr {
 	c := &BasicSleepyUintptr{
 		batcher: batcher,
@@ -33,6 +36,7 @@ func NewBasicSleepyUintptr(batcher Batcher) *BasicSleepyUintptr {
 
 const basicSleepyUintptrLocked = uintptr(1)
 
+// Do passes value to Batcher and waits for completion
 func (c *BasicSleepyUintptr) Do(op interface{}) {
 	node := &basicSleepyUintptrNode{argument: op}
 

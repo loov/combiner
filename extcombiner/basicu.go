@@ -5,7 +5,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BasicUintptr is an unbounded spinning combiner queue using uintptr internally
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BasicUintptr struct {
 	head    uintptr // *basicUintptrNode
 	_       [7]uint64
@@ -17,6 +19,7 @@ type basicUintptrNode struct {
 	argument interface{}
 }
 
+// NewBasicUintptr creates a BasicUintptr queue.
 func NewBasicUintptr(batcher Batcher) *BasicUintptr {
 	return &BasicUintptr{
 		batcher: batcher,
@@ -26,6 +29,7 @@ func NewBasicUintptr(batcher Batcher) *BasicUintptr {
 
 const basicUintptrLocked = uintptr(1)
 
+// Do passes value to Batcher and waits for completion
 func (c *BasicUintptr) Do(op interface{}) {
 	node := &basicUintptrNode{argument: op}
 

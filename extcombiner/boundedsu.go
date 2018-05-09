@@ -6,7 +6,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BoundedSleepyUintptr is a bounded non-spinning combiner queue using uintptr internally
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BoundedSleepyUintptr struct {
 	head    uintptr // *boundedSleepyUintptrNode
 	_       [7]uint64
@@ -22,6 +24,7 @@ type boundedSleepyUintptrNode struct {
 	argument interface{}
 }
 
+// NewBoundedSleepyUintptr creates a BoundedSleepyUintptr queue.
 func NewBoundedSleepyUintptr(batcher Batcher, limit int) *BoundedSleepyUintptr {
 	c := &BoundedSleepyUintptr{
 		batcher: batcher,
@@ -37,6 +40,7 @@ const (
 	boundedSleepyUintptrHandoffTag = uintptr(2)
 )
 
+// Do passes value to Batcher and waits for completion
 func (c *BoundedSleepyUintptr) Do(arg interface{}) {
 	node := &boundedSleepyUintptrNode{argument: arg}
 

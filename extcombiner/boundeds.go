@@ -6,7 +6,9 @@ import (
 	"unsafe"
 )
 
-// based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
+// BoundedSleepy is a bounded non-spinning combiner queue
+//
+// Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
 type BoundedSleepy struct {
 	head    unsafe.Pointer // *boundedSleepyNode
 	_       [7]uint64
@@ -23,6 +25,7 @@ type boundedSleepyNode struct {
 	argument interface{}
 }
 
+// NewBoundedSleepy creates a BoundedSleepy queue.
 func NewBoundedSleepy(batcher Batcher, limit int) *BoundedSleepy {
 	c := &BoundedSleepy{
 		batcher: batcher,
@@ -37,6 +40,7 @@ var boundedSleepyLockedElem = boundedSleepyNode{}
 var boundedSleepyLockedNode = &boundedSleepyLockedElem
 var boundedSleepyLocked = (unsafe.Pointer)(boundedSleepyLockedNode)
 
+// Do passes value to Batcher and waits for completion
 func (c *BoundedSleepy) Do(arg interface{}) {
 	node := &boundedSleepyNode{argument: arg}
 
