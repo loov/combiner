@@ -1,9 +1,9 @@
 package extcombiner
 
 import (
+	"runtime"
 	"sync"
-
-	"github.com/egonelbre/exp/sync2"
+	"sync/atomic"
 )
 
 type Mutex struct {
@@ -26,7 +26,7 @@ func (c *Mutex) Do(v interface{}) {
 }
 
 type SpinMutex struct {
-	mu      sync2.SpinMutex
+	mu      spinmutex
 	batcher Batcher
 }
 
@@ -42,4 +42,23 @@ func (c *SpinMutex) Do(v interface{}) {
 	c.batcher.Include(v)
 	c.batcher.Finish()
 	c.mu.Unlock()
+}
+
+type spinmutex struct {
+	locked int64
+	_      [7]int64
+}
+
+func (m *spinmutex) Lock() {
+	for atomic.SwapInt64(&m.locked, 1) == 1 {
+		for try := 0; atomic.LoadInt64(&m.locked) == 1; try++ {
+			if try > 256 {
+				runtime.Gosched()
+			}
+		}
+	}
+}
+
+func (m *spinmutex) Unlock() {
+	atomic.StoreInt64(&m.locked, 0)
 }
