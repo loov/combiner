@@ -15,3 +15,5 @@ x.*.go
 
 *.sublime-workspace
 .vscode
+*.gob
+*.zgob

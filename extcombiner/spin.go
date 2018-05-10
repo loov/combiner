@@ -4,7 +4,7 @@ import "runtime"
 
 func spin(v *int) {
 	*v++
-	if *v >= 128 {
+	if *v >= 8 {
 		runtime.Gosched()
 	}
 }

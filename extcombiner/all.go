@@ -5,7 +5,7 @@ import "github.com/loov/combiner/testsuite"
 // All contains all combiner queue descriptions
 var All = testsuite.Descs{
 	{"Mutex", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewMutex(bat) }},
-	{"SpinMutex", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewSpinMutex(bat) }},
+	// {"SpinMutex", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewSpinMutex(bat) }},
 	{"Basic", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewBasic(bat) }},
 	{"BasicS", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewBasicSleepy(bat) }},
 	{"BasicU", false, func(bat testsuite.Batcher, bound int) testsuite.Combiner { return NewBasicUintptr(bat) }},
