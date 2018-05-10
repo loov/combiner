@@ -46,6 +46,7 @@ func RunLatency(t *testing.T, procs int, create func(Batcher) Combiner) {
 						}(hrs[i])
 					}
 
+					wg.Wait()
 					// TODO: save benchmark results to file
 				})
 			}
