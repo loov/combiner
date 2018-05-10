@@ -17,3 +17,4 @@ x.*.go
 .vscode
 *.gob
 *.zgob
+*.svg

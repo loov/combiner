@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,15 +34,15 @@ func main() {
 	enc := gob.NewEncoder(compressor)
 
 	const N = 1000
-	const K = 10
+	const K = 1
 
 	params := testsuite.Params{
 		Procs:  []int{1, 4, 32, 256},
-		Bounds: []int{4, 8, 16, 64},
+		Bounds: []int{64},
 
-		WorkStart:   []int{0, 100},
-		WorkInclude: []int{0},
-		WorkFinish:  []int{0, 100},
+		WorkStart:   []int{100},
+		WorkInclude: []int{100},
+		WorkFinish:  []int{1000},
 	}
 
 	params.Iterate(extcombiner.All, func(setup *testsuite.Setup) {
@@ -77,15 +78,20 @@ func main() {
 		average := time.Duration(0)
 		count := 0
 		var results [][]time.Duration
+		var all []time.Duration
 		for _, hr := range hrs {
 			laps := hr.Laps()
 			count += len(laps)
+			all = append(all, laps...)
 			for _, lap := range laps {
 				average += lap
 			}
 			results = append(results, laps)
 		}
-		fmt.Println(average / time.Duration(count))
+
+		sort.Slice(all, func(i, k int) bool { return all[i] < all[k] })
+		p := int(0.9999 * float64(len(all)))
+		fmt.Println(average/time.Duration(count), "\t", all[p])
 		enc.Encode(results)
 	})
 }
