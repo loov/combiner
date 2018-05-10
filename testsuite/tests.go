@@ -5,26 +5,22 @@ import (
 	"testing"
 )
 
-func RunTests(t *testing.T, procs int, create func(Batcher) Combiner) {
-	t.Run("Sum", func(t *testing.T) {
-		testSum(t, procs, create)
-	})
-	t.Run("SumSequence", func(t *testing.T) {
-		testSumSequence(t, procs, create)
-	})
+func RunTests(t *testing.T, setup *Setup) {
+	t.Helper()
+	setup.Test(t, "Sum", testSum)
+	setup.Test(t, "SumSequence", testSum)
 }
 
-func testSum(t *testing.T, procs int, create func(Batcher) Combiner) {
+func testSum(t *testing.T, setup *Setup) {
 	const N = 100
 
-	var worker Worker
-	combiner := create(&worker)
+	worker, combiner := setup.Make()
 	defer StartClose(combiner)()
 
 	var wg sync.WaitGroup
 
-	wg.Add(procs)
-	for proc := 0; proc < procs; proc++ {
+	wg.Add(setup.Procs)
+	for proc := 0; proc < setup.Procs; proc++ {
 		go func() {
 			for i := int64(0); i < N; i++ {
 				combiner.Do(int64(1))
@@ -34,23 +30,22 @@ func testSum(t *testing.T, procs int, create func(Batcher) Combiner) {
 	}
 
 	wg.Wait()
-	if worker.Total != N*int64(procs) {
-		t.Fatalf("got %v expected %v", worker.Total, N*procs)
+	if worker.Total != N*int64(setup.Procs) {
+		t.Fatalf("got %v expected %v", worker.Total, N*setup.Procs)
 	}
 }
 
-func testSumSequence(t *testing.T, procs int, create func(Batcher) Combiner) {
+func testSumSequence(t *testing.T, setup *Setup) {
 	const N = 100
 
-	var worker Worker
-	combiner := create(&worker)
+	worker, combiner := setup.Make()
 	defer StartClose(combiner)()
 
 	var wg sync.WaitGroup
 
-	wg.Add(procs)
+	wg.Add(setup.Procs)
 
-	for proc := 0; proc < procs; proc++ {
+	for proc := 0; proc < setup.Procs; proc++ {
 		go func() {
 			for i := int64(0); i < N; i++ {
 				combiner.Do(i)
@@ -60,7 +55,7 @@ func testSumSequence(t *testing.T, procs int, create func(Batcher) Combiner) {
 	}
 
 	wg.Wait()
-	if worker.Total != int64(procs)*N*(N-1)/2 {
-		t.Fatalf("got %v expected %v", worker.Total, N*procs)
+	if worker.Total != int64(setup.Procs)*N*(N-1)/2 {
+		t.Fatalf("got %v expected %v", worker.Total, N*setup.Procs)
 	}
 }

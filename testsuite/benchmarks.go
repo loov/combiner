@@ -5,31 +5,25 @@ import (
 	"testing"
 )
 
-func RunBenchmarks(b *testing.B, procs int, create func(Batcher) Combiner) {
+func RunBenchmarks(b *testing.B, setup *Setup) {
 	b.Helper()
-	b.Run("Sum/s0i0f0", func(b *testing.B) {
-		var worker Worker
-		benchSum(b, &worker, procs, create)
-	})
-
-	b.Run("Sum/s0i0f100", func(b *testing.B) {
-		var worker Worker
-		worker.WorkFinish = 100
-		benchSum(b, &worker, procs, create)
-	})
+	setup.Bench(b, "Sum", benchSum)
 }
 
-func benchSum(b *testing.B, worker *Worker, procs int, create func(Batcher) Combiner) {
+func benchSum(b *testing.B, setup *Setup) {
 	const N = 100
-	combiner := create(worker)
+
+	_, combiner := setup.Make()
 	defer StartClose(combiner)()
 
+	b.ResetTimer()
+
 	var wg sync.WaitGroup
-	wg.Add(procs)
+	wg.Add(setup.Procs)
 
 	left := b.N
-	for i := 0; i < procs; i++ {
-		chunk := left / (procs - i)
+	for i := 0; i < setup.Procs; i++ {
+		chunk := left / (setup.Procs - i)
 		go func(n int) {
 			for i := 0; i < n; i++ {
 				combiner.Do(int64(1))
