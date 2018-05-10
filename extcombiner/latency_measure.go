@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	outputfile, err := os.Create("latency.zgob")
+	outputfile, err := os.Create("latency2.zgob")
 	if err != nil {
 		log.Fatal(err)
 	}
