@@ -6,6 +6,10 @@ import (
 )
 
 // Parking is a bounded non-spinning combiner queue.
+//
+// This implementation is useful when the batcher work is large
+// ore there are many goroutines concurrently calling Do. A good example
+// would be a appending to a file.
 type Parking struct {
 	limit   int64
 	batcher Batcher
