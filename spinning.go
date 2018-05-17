@@ -4,6 +4,14 @@ import (
 	"runtime"
 )
 
+// Spinning is a combiner queue with spinning waiters.
+//
+// This implementation is useful when the batcher work is small
+// and there are few goroutines concurrently calling Do. A good example
+// would be a shared data-structure.
+//
+// If very high performance is required benchmark replacing Batcher
+// and argument with concrete implementation.
 type Spinning struct {
 	limit   int64
 	batcher Batcher
@@ -12,10 +20,16 @@ type Spinning struct {
 	_       [7]uint64
 }
 
+// NewSpinning creates a spinning combiner with the given limit
 func NewSpinning(batcher Batcher, limit int) *Spinning {
+	if limit < 0 {
+		panic("combiner limit must be positive")
+	}
 	return &Spinning{limit: int64(limit), batcher: batcher}
 }
 
+// Do passes arg safely to batcher and calls Start / Finish.
+// The methods maybe called in a different goroutine.
 //go:nosplit
 //go:noinline
 func (q *Spinning) Do(arg interface{}) {
