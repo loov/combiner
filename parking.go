@@ -2,37 +2,39 @@ package combiner
 
 import (
 	"runtime"
+	"sync"
 )
 
-// Spinning is a combiner queue with spinning waiters.
-//
-// This implementation is useful when the batcher work is small
-// and there are few goroutines concurrently calling Do. A good example
-// would be a shared data-structure.
-//
-// If very high performance is required benchmark replacing Batcher
-// and argument with concrete implementation.
-type Spinning struct {
+// Parking is a bounded non-spinning combiner queue.
+type Parking struct {
 	limit   int64
 	batcher Batcher
-	_       [5]uint64
+	_       [5]int64
 	head    nodeptr
-	_       [7]uint64
+	_       [7]int64
+	lock    sync.Mutex
+	cond    sync.Cond
 }
 
-// NewSpinning creates a spinning combiner with the given limit
-func NewSpinning(batcher Batcher, limit int) *Spinning {
+// NewParking creates a Parking combiner queue
+func NewParking(batcher Batcher, limit int) *Parking {
 	if limit < 0 {
 		panic("combiner limit must be positive")
 	}
-	return &Spinning{limit: int64(limit), batcher: batcher}
+
+	q := &Parking{
+		batcher: batcher,
+		limit:   int64(limit),
+		head:    0,
+	}
+	q.cond.L = &q.lock
+	return q
 }
 
-// Do passes arg safely to batcher and calls Start / Finish.
-// The methods maybe called in a different goroutine.
+// Do passes value to Batcher and waits for completion
 //go:nosplit
 //go:noinline
-func (q *Spinning) Do(arg interface{}) {
+func (q *Parking) Do(arg interface{}) {
 	var mynode node
 	my := &mynode
 	my.argument = arg
@@ -65,22 +67,32 @@ func (q *Spinning) Do(arg interface{}) {
 				goto combining
 			}
 		}
-		// yielding busy wait
+
+		q.lock.Lock()
 		for {
 			next := atomicLoadNodeptr(&my.next)
 			if next == 0 {
+				q.lock.Unlock()
 				return
 			}
 			if next&handoffTag != 0 {
 				my.next &^= handoffTag
 				handoff = true
+				q.lock.Unlock()
 				goto combining
 			}
-			runtime.Gosched()
+
+			q.cond.Wait()
 		}
 	}
 
 combining:
+	defer func() {
+		q.lock.Lock()
+		q.cond.Broadcast()
+		q.lock.Unlock()
+	}()
+
 	q.batcher.Start()
 	defer q.batcher.Finish()
 
