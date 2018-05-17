@@ -1,6 +1,7 @@
 package combiner
 
 import (
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -17,3 +18,16 @@ const (
 	locked     = nodeptr(1)
 	handoffTag = nodeptr(2)
 )
+
+func atomicLoadNodeptr(p *nodeptr) nodeptr {
+	return atomic.LoadUintptr(p)
+}
+func atomicStoreNodeptr(p *nodeptr, v nodeptr) {
+	atomic.StoreUintptr(p, v)
+}
+
+func atomicCompareAndSwapNodeptr(addr *uintptr, old, new uintptr) bool {
+	return atomic.CompareAndSwapUintptr(addr, old, new)
+}
+
+func nodeptrToNode(p nodeptr) *node { return (*node)(unsafe.Pointer(p)) }

@@ -2,8 +2,6 @@ package combiner
 
 import (
 	"runtime"
-	"sync/atomic"
-	"unsafe"
 )
 
 type Spinning struct {
@@ -27,13 +25,13 @@ func (q *Spinning) Do(arg interface{}) {
 
 	var cmp nodeptr
 	for {
-		cmp = atomic.LoadUintptr(&q.head)
+		cmp = atomicLoadNodeptr(&q.head)
 		xchg := locked
 		if cmp != 0 {
 			xchg = my.ref()
 			my.next = cmp
 		}
-		if atomic.CompareAndSwapUintptr(&q.head, cmp, xchg) {
+		if atomicCompareAndSwapNodeptr(&q.head, cmp, xchg) {
 			break
 		}
 	}
@@ -42,7 +40,7 @@ func (q *Spinning) Do(arg interface{}) {
 	if cmp != 0 {
 		// busy wait
 		for i := 0; i < 8; i++ {
-			next := atomic.LoadUintptr(&my.next)
+			next := atomicLoadNodeptr(&my.next)
 			if next == 0 {
 				return
 			}
@@ -54,7 +52,7 @@ func (q *Spinning) Do(arg interface{}) {
 		}
 		// yielding busy wait
 		for {
-			next := atomic.LoadUintptr(&my.next)
+			next := atomicLoadNodeptr(&my.next)
 			if next == 0 {
 				return
 			}
@@ -80,13 +78,13 @@ combining:
 
 combinecheck:
 	for {
-		cmp = atomic.LoadUintptr(&q.head)
+		cmp = atomicLoadNodeptr(&q.head)
 		var xchg uintptr = 0
 		if cmp != locked {
 			xchg = locked
 		}
 
-		if atomic.CompareAndSwapUintptr(&q.head, cmp, xchg) {
+		if atomicCompareAndSwapNodeptr(&q.head, cmp, xchg) {
 			break
 		}
 	}
@@ -99,9 +97,9 @@ combinecheck:
 combine:
 	// Execute the list of operations.
 	for cmp != locked {
-		other := (*node)(unsafe.Pointer(cmp))
+		other := nodeptrToNode(cmp)
 		if count == q.limit {
-			atomic.StoreUintptr(&other.next, other.next|handoffTag)
+			atomicStoreNodeptr(&other.next, other.next|handoffTag)
 			return
 		}
 		cmp = other.next
@@ -109,7 +107,7 @@ combine:
 		q.batcher.Include(other.argument)
 		count++
 		// Mark completion.
-		atomic.StoreUintptr(&other.next, 0)
+		atomicStoreNodeptr(&other.next, 0)
 	}
 
 	goto combinecheck
