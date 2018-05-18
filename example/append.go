@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -18,7 +19,7 @@ const (
 )
 
 type CombiningFile struct {
-	add  combiner.Spinning
+	add  combiner.Parking
 	file *os.File
 }
 type combiningAppend CombiningFile
@@ -32,7 +33,7 @@ func NewCombiningFile(f *os.File) *CombiningFile {
 
 func (m *CombiningFile) WriteByte(b byte) { m.add.Do(b) }
 
-func (m *combiningAppend) Start()             {}
+func (m *combiningAppend) Start()             { runtime.Gosched() }
 func (m *combiningAppend) Do(arg interface{}) { m.file.Write([]byte{arg.(byte)}) }
 func (m *combiningAppend) Finish()            { m.file.Sync() }
 
