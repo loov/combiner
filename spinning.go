@@ -91,8 +91,6 @@ func (q *Spinning) Do(arg interface{}) {
 
 combining:
 	q.batcher.Start()
-	defer q.batcher.Finish()
-
 	q.batcher.Include(my.argument)
 	count := int64(1)
 
@@ -115,6 +113,7 @@ combinecheck:
 
 	// No more operations to combine, return.
 	if cmp == locked {
+		q.batcher.Finish()
 		return
 	}
 
@@ -124,6 +123,7 @@ combine:
 		other := nodeptrToNode(cmp)
 		if count == q.limit {
 			atomicStoreNodeptr(&other.next, other.next|handoffTag)
+			q.batcher.Finish()
 			return
 		}
 		cmp = other.next

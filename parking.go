@@ -95,15 +95,7 @@ func (q *Parking) Do(arg interface{}) {
 	}
 
 combining:
-	defer func() {
-		q.lock.Lock()
-		q.cond.Broadcast()
-		q.lock.Unlock()
-	}()
-
 	q.batcher.Start()
-	defer q.batcher.Finish()
-
 	q.batcher.Include(my.argument)
 	count := int64(1)
 
@@ -126,6 +118,11 @@ combinecheck:
 
 	// No more operations to combine, return.
 	if cmp == locked {
+		q.batcher.Finish()
+
+		q.lock.Lock()
+		q.cond.Broadcast()
+		q.lock.Unlock()
 		return
 	}
 
@@ -135,6 +132,12 @@ combine:
 		other := nodeptrToNode(cmp)
 		if count == q.limit {
 			atomicStoreNodeptr(&other.next, other.next|handoffTag)
+
+			q.batcher.Finish()
+
+			q.lock.Lock()
+			q.cond.Broadcast()
+			q.lock.Unlock()
 			return
 		}
 		cmp = other.next
