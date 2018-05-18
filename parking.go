@@ -22,17 +22,21 @@ type Parking struct {
 
 // NewParking creates a Parking combiner queue
 func NewParking(batcher Batcher, limit int) *Parking {
+	q := &Parking{}
+	q.Init(batcher, limit)
+	return q
+}
+
+// Init initializes a Spinning combiner.
+// Note: NewSpinning does this automatically.
+func (q *Parking) Init(batcher Batcher, limit int) {
 	if limit < 0 {
 		panic("combiner limit must be positive")
 	}
 
-	q := &Parking{
-		batcher: batcher,
-		limit:   int64(limit),
-		head:    0,
-	}
+	q.batcher = batcher
+	q.limit = int64(limit)
 	q.cond.L = &q.lock
-	return q
 }
 
 // Do passes value to Batcher and waits for completion

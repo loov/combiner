@@ -22,10 +22,19 @@ type Spinning struct {
 
 // NewSpinning creates a spinning combiner with the given limit
 func NewSpinning(batcher Batcher, limit int) *Spinning {
+	q := &Spinning{}
+	q.Init(batcher, limit)
+	return q
+}
+
+// Init initializes a Spinning combiner.
+// Note: NewSpinning does this automatically.
+func (q *Spinning) Init(batcher Batcher, limit int) {
 	if limit < 0 {
 		panic("combiner limit must be positive")
 	}
-	return &Spinning{limit: int64(limit), batcher: batcher}
+	q.batcher = batcher
+	q.limit = int64(limit)
 }
 
 // Do passes arg safely to batcher and calls Start / Finish.
