@@ -35,8 +35,9 @@ func main() {
 	fmt.Println("MutexFile", Bench(NewMutexFile(f)))
 
 	// Output:
-	// CombiningFile 163.661342ms
-	// MutexFile 11.084999209s
+	// CombiningFile 161.179503ms
+	// ChanFile 220.223679ms
+	// MutexFile 10.987153817s
 }
 
 type Writer interface {
@@ -127,10 +128,23 @@ func (m *ChanFile) Start() {
 		var requests = []request{}
 		for {
 			requests = requests[:0]
+
+			r, ok := <-m.req
+			if !ok {
+				return
+			}
+
+			requests = append(requests, r)
+			m.file.Write([]byte{r.v})
+
 		combining:
-			for count := 0; count < 100; count++ {
+			for count := 1; count < 100; count++ {
 				select {
-				case r := <-m.req:
+				case r, ok := <-m.req:
+					if !ok {
+						break combining
+					}
+
 					requests = append(requests, r)
 					m.file.Write([]byte{r.v})
 				default:
