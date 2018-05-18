@@ -7,96 +7,60 @@ import (
 	"github.com/loov/combiner"
 )
 
-func BenchmarkSpinningInvokerUncontended(b *testing.B) {
+type Nop struct{}
+
+func (n *Nop) Start()             {}
+func (n *Nop) Do(arg interface{}) {}
+func (n *Nop) Finish()            {}
+
+func BenchmarkSpinningNopUncontended(b *testing.B) {
 	var q combiner.Spinning
-	q.Init(combiner.Invoker{}, 256)
+	q.Init(&Nop{}, 256)
 	for i := 0; i < b.N; i++ {
-		q.Do(func() {})
+		q.Do(nil)
 	}
 }
 
-func BenchmarkSpinningInvokerContended(b *testing.B) {
+func BenchmarkSpinningNopContended(b *testing.B) {
 	var q combiner.Spinning
-	q.Init(combiner.Invoker{}, 256)
+	q.Init(&Nop{}, 256)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			q.Do(func() {})
+			q.Do(nil)
 		}
 	})
 }
-func BenchmarkLockInvokerUncontended(b *testing.B) {
+func BenchmarkLockNopUncontended(b *testing.B) {
 	var mu sync.Mutex
 	for i := 0; i < b.N; i++ {
 		mu.Lock()
-		(func() {})()
 		mu.Unlock()
 	}
 }
 
-func BenchmarkLockInvokerContended(b *testing.B) {
+func BenchmarkLockNopContended(b *testing.B) {
 	var mu sync.Mutex
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			mu.Lock()
-			(func() {})()
 			mu.Unlock()
 		}
 	})
 }
-func BenchmarkSpinningIncludeFnUncontended(b *testing.B) {
-	bat := combiner.IncludeFunc(func(arg interface{}) {})
-	var q combiner.Spinning
-	q.Init(bat, 256)
+func BenchmarkParkingNopUncontended(b *testing.B) {
+	var q combiner.Parking
+	q.Init(&Nop{}, 256)
 	for i := 0; i < b.N; i++ {
-		q.Do(0)
+		q.Do(nil)
 	}
 }
 
-func BenchmarkSpinningIncludeFnContended(b *testing.B) {
-	bat := combiner.IncludeFunc(func(arg interface{}) {})
-	var q combiner.Spinning
-	q.Init(bat, 256)
+func BenchmarkParkingNopContended(b *testing.B) {
+	var q combiner.Parking
+	q.Init(&Nop{}, 256)
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			q.Do(0)
-		}
-	})
-}
-
-func BenchmarkParkingInvokerUncontended(b *testing.B) {
-	var q combiner.Parking
-	q.Init(combiner.Invoker{}, 256)
-	for i := 0; i < b.N; i++ {
-		q.Do(func() {})
-	}
-}
-
-func BenchmarkParkingInvokerContended(b *testing.B) {
-	var q combiner.Parking
-	q.Init(combiner.Invoker{}, 256)
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			q.Do(func() {})
-		}
-	})
-}
-
-func BenchmarkParkingIncludeFnUncontended(b *testing.B) {
-	bat := combiner.IncludeFunc(func(arg interface{}) {})
-	var q combiner.Parking
-	q.Init(bat, 256)
-	for i := 0; i < b.N; i++ {
-		q.Do(0)
-	}
-}
-
-func BenchmarkParkingIncludeFnContended(b *testing.B) {
-	bat := combiner.IncludeFunc(func(arg interface{}) {})
-	var q combiner.Parking
-	q.Init(bat, 256)
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			q.Do(0)
+			q.Do(nil)
 		}
 	})
 }
