@@ -40,9 +40,9 @@ func main() {
 		Procs:  []int{1, 4, 32, 256},
 		Bounds: []int{64},
 
-		WorkStart:   []int{100},
-		WorkInclude: []int{100},
-		WorkFinish:  []int{1000},
+		WorkStart:  []int{100},
+		WorkDo:     []int{100},
+		WorkFinish: []int{1000},
 	}
 
 	params.Iterate(extcombiner.All, func(setup *testsuite.Setup) {

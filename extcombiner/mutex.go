@@ -25,7 +25,7 @@ func NewMutex(batcher Batcher) *Mutex {
 func (c *Mutex) Do(v interface{}) {
 	c.mu.Lock()
 	c.batcher.Start()
-	c.batcher.Include(v)
+	c.batcher.Do(v)
 	c.batcher.Finish()
 	c.mu.Unlock()
 }
@@ -49,7 +49,7 @@ func NewSpinMutex(batcher Batcher) *SpinMutex {
 func (c *SpinMutex) Do(v interface{}) {
 	c.mu.Lock()
 	c.batcher.Start()
-	c.batcher.Include(v)
+	c.batcher.Do(v)
 	c.batcher.Finish()
 	c.mu.Unlock()
 }

@@ -79,7 +79,7 @@ func (c *BoundedSpinning) Do(arg interface{}) {
 
 	var count int
 	if !handoff {
-		c.batcher.Include(node.argument)
+		c.batcher.Do(node.argument)
 		count++
 	} else {
 		// Execute the list of operations.
@@ -89,7 +89,7 @@ func (c *BoundedSpinning) Do(arg interface{}) {
 				return
 			}
 			next := (*boundedSpinningNode)(node.next)
-			c.batcher.Include(node.argument)
+			c.batcher.Do(node.argument)
 			count++
 			// Mark completion.
 			atomic.StorePointer(&node.next, nil)
@@ -127,7 +127,7 @@ func (c *BoundedSpinning) Do(arg interface{}) {
 				return
 			}
 			next := (*boundedSpinningNode)(node.next)
-			c.batcher.Include(node.argument)
+			c.batcher.Do(node.argument)
 			count++
 			// Mark completion.
 			atomic.StorePointer(&node.next, nil)

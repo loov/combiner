@@ -87,7 +87,7 @@ func (c *BoundedParkingUintptr) Do(arg interface{}) {
 
 	// First, execute own operation.
 	c.batcher.Start()
-	c.batcher.Include(node.argument)
+	c.batcher.Do(node.argument)
 	count++
 
 	// Then, look for combining opportunities.
@@ -132,7 +132,7 @@ func (c *BoundedParkingUintptr) Do(arg interface{}) {
 			}
 			cmp = node.next
 
-			c.batcher.Include(node.argument)
+			c.batcher.Do(node.argument)
 			count++
 			// Mark completion.
 			atomic.StoreUintptr(&node.next, 0)

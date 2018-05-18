@@ -121,7 +121,7 @@ func main() {
 
 			procGroup.Add(plot.NewGrid())
 		}
-		if result.WorkStart == 100 && result.WorkInclude == 0 && result.WorkFinish == 100 {
+		if result.WorkStart == 100 && result.WorkDo == 0 && result.WorkFinish == 100 {
 			all := []float64{}
 
 			total := 0.0

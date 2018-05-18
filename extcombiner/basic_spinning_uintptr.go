@@ -74,7 +74,7 @@ func (c *BasicSpinningUintptr) Do(op interface{}) {
 		c.batcher.Start()
 		defer c.batcher.Finish()
 
-		c.batcher.Include(node.argument)
+		c.batcher.Do(node.argument)
 
 		// Then, look for combining opportunities.
 		for {
@@ -103,7 +103,7 @@ func (c *BasicSpinningUintptr) Do(op interface{}) {
 				node = (*basicSpinningUintptrNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
-				c.batcher.Include(node.argument)
+				c.batcher.Do(node.argument)
 				// Mark completion.
 				atomic.StoreUintptr(&node.next, 0)
 			}

@@ -17,7 +17,7 @@ type AsyncCombiner interface {
 
 type Batcher interface {
 	Start()
-	Include(op interface{})
+	Do(op interface{})
 	Finish()
 }
 

@@ -71,7 +71,7 @@ func (c *BasicParkingUintptr) Do(op interface{}) {
 	} else {
 		c.batcher.Start()
 
-		c.batcher.Include(node.argument)
+		c.batcher.Do(node.argument)
 
 		for {
 			for {
@@ -99,7 +99,7 @@ func (c *BasicParkingUintptr) Do(op interface{}) {
 				node = (*basicParkingUintptrNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
-				c.batcher.Include(node.argument)
+				c.batcher.Do(node.argument)
 				// Mark completion.
 				atomic.StoreUintptr(&node.next, 0)
 			}

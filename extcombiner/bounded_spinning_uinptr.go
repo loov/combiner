@@ -78,7 +78,7 @@ func (c *BoundedSpinningUintptr) Do(arg interface{}) {
 	// First, execute own operation.
 	c.batcher.Start()
 	defer c.batcher.Finish()
-	c.batcher.Include(node.argument)
+	c.batcher.Do(node.argument)
 	count++
 
 	// Then, look for combining opportunities.
@@ -118,7 +118,7 @@ func (c *BoundedSpinningUintptr) Do(arg interface{}) {
 			}
 			cmp = node.next
 
-			c.batcher.Include(node.argument)
+			c.batcher.Do(node.argument)
 			count++
 			// Mark completion.
 			atomic.StoreUintptr(&node.next, 0)

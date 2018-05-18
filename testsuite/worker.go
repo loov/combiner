@@ -6,13 +6,13 @@ import (
 )
 
 type Worker struct {
-	WorkStart   int
-	WorkInclude int
-	WorkFinish  int
+	WorkStart  int
+	WorkDo     int
+	WorkFinish int
 
-	SleepStart   time.Duration
-	SleepInclude time.Duration
-	SleepFinish  time.Duration
+	SleepStart  time.Duration
+	SleepDo     time.Duration
+	SleepFinish time.Duration
 
 	Total   int64
 	Batches int64
@@ -24,9 +24,9 @@ func (exe *Worker) Start() {
 	simulateWork(exe.WorkStart, exe.SleepStart)
 }
 
-func (exe *Worker) Include(v interface{}) {
+func (exe *Worker) Do(v interface{}) {
 	exe.Total += v.(int64)
-	simulateWork(exe.WorkInclude, exe.SleepInclude)
+	simulateWork(exe.WorkDo, exe.SleepDo)
 }
 
 func (exe *Worker) Finish() {

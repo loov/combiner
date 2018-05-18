@@ -8,19 +8,19 @@ import (
 
 var (
 	Test = Params{
-		Procs:       []int{1, 2, 3, 4, 8, 16, 32, 64},
-		Bounds:      []int{1, 2, 3, 4, 5, 6, 7, 8},
-		WorkStart:   []int{0},
-		WorkInclude: []int{0},
-		WorkFinish:  []int{0},
+		Procs:      []int{1, 2, 3, 4, 8, 16, 32, 64},
+		Bounds:     []int{1, 2, 3, 4, 5, 6, 7, 8},
+		WorkStart:  []int{0},
+		WorkDo:     []int{0},
+		WorkFinish: []int{0},
 	}
 
 	Bench = Params{
-		Procs:       []int{1, 4, 32, 256},
-		Bounds:      []int{4, 8, 16, 64},
-		WorkStart:   []int{0},
-		WorkInclude: []int{0},
-		WorkFinish:  []int{0, 100},
+		Procs:      []int{1, 4, 32, 256},
+		Bounds:     []int{4, 8, 16, 64},
+		WorkStart:  []int{0},
+		WorkDo:     []int{0},
+		WorkFinish: []int{0, 100},
 	}
 )
 
@@ -33,11 +33,11 @@ type Desc struct {
 type Descs []Desc
 
 type Params struct {
-	Procs       []int
-	Bounds      []int
-	WorkStart   []int
-	WorkInclude []int
-	WorkFinish  []int
+	Procs      []int
+	Bounds     []int
+	WorkStart  []int
+	WorkDo     []int
+	WorkFinish []int
 }
 
 func (params *Params) Iterate(descs Descs, fn func(*Setup)) {
@@ -54,7 +54,7 @@ func (params *Params) Iterate(descs Descs, fn func(*Setup)) {
 		for _, setup.Bounds = range bounds {
 			for _, setup.Procs = range params.Procs {
 				for _, setup.WorkStart = range params.WorkStart {
-					for _, setup.WorkInclude = range params.WorkInclude {
+					for _, setup.WorkDo = range params.WorkDo {
 						for _, setup.WorkFinish = range params.WorkFinish {
 							tmp := setup
 							fn(&tmp)
@@ -67,13 +67,13 @@ func (params *Params) Iterate(descs Descs, fn func(*Setup)) {
 }
 
 type Setup struct {
-	Name        string
-	Create      func(exe Batcher, bound int) Combiner
-	Bounds      int
-	Procs       int
-	WorkStart   int
-	WorkInclude int
-	WorkFinish  int
+	Name       string
+	Create     func(exe Batcher, bound int) Combiner
+	Bounds     int
+	Procs      int
+	WorkStart  int
+	WorkDo     int
+	WorkFinish int
 }
 
 func init() { gob.Register(Setup{}) }
@@ -81,7 +81,7 @@ func init() { gob.Register(Setup{}) }
 func (setup *Setup) Make() (*Worker, Combiner) {
 	worker := &Worker{}
 	worker.WorkStart = setup.WorkStart
-	worker.WorkInclude = setup.WorkInclude
+	worker.WorkDo = setup.WorkDo
 	worker.WorkFinish = setup.WorkFinish
 	combiner := setup.Create(worker, setup.Bounds)
 	return worker, combiner
@@ -94,7 +94,7 @@ func (setup *Setup) FullName(test string) string {
 		test,
 		setup.Procs,
 		setup.WorkStart,
-		setup.WorkInclude,
+		setup.WorkDo,
 		setup.WorkFinish,
 	)
 }

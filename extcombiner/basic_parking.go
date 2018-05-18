@@ -81,7 +81,7 @@ func (c *BasicParking) do(op interface{}, async bool) {
 		c.lock.Unlock()
 	} else {
 		c.batcher.Start()
-		c.batcher.Include(node.argument)
+		c.batcher.Do(node.argument)
 
 		for {
 			for {
@@ -104,7 +104,7 @@ func (c *BasicParking) do(op interface{}, async bool) {
 				node = (*basicParkingNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
-				c.batcher.Include(node.argument)
+				c.batcher.Do(node.argument)
 				atomic.StorePointer(&node.next, nil)
 			}
 		}
