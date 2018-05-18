@@ -25,6 +25,12 @@ func main() {
 	f.Seek(0, os.SEEK_SET)
 	fmt.Println("CombiningFile", Bench(NewCombiningFile(f)))
 
+	cfile := NewChanFile(f)
+	cfile.Start()
+	f.Seek(0, os.SEEK_SET)
+	fmt.Println("ChanFile", Bench(cfile))
+	cfile.Stop()
+
 	f.Seek(0, os.SEEK_SET)
 	fmt.Println("MutexFile", Bench(NewMutexFile(f)))
 
@@ -92,3 +98,52 @@ func (m *MutexFile) WriteByte(b byte) {
 	m.file.Sync()
 	m.mu.Unlock()
 }
+
+type ChanFile struct {
+	req  chan request
+	file *os.File
+}
+
+type request struct {
+	v    byte
+	done chan struct{}
+}
+
+func NewChanFile(f *os.File) *ChanFile {
+	m := &ChanFile{}
+	m.req = make(chan request, 100)
+	m.file = f
+	return m
+}
+
+func (m *ChanFile) WriteByte(b byte) {
+	r := request{b, make(chan struct{}, 0)}
+	m.req <- r
+	<-r.done
+}
+
+func (m *ChanFile) Start() {
+	go func() {
+		var requests = []request{}
+		for {
+			requests = requests[:0]
+		combining:
+			for count := 0; count < 100; count++ {
+				select {
+				case r := <-m.req:
+					requests = append(requests, r)
+					m.file.Write([]byte{r.v})
+				default:
+					break combining
+				}
+			}
+
+			m.file.Sync()
+			for _, req := range requests {
+				close(req.done)
+			}
+		}
+	}()
+}
+
+func (m *ChanFile) Stop() { close(m.req) }
