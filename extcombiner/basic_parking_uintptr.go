@@ -7,11 +7,11 @@ import (
 	"unsafe"
 )
 
-// BasicSleepyUintptr is an unbounded non-spinning combiner queue using uintptr internally
+// BasicParkingUintptr is an unbounded non-spinning combiner queue using uintptr internally
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type BasicSleepyUintptr struct {
-	head    uintptr // *basicSleepyUintptrNode
+type BasicParkingUintptr struct {
+	head    uintptr // *basicParkingUintptrNode
 	_       [7]uint64
 	lock    sync.Mutex
 	cond    sync.Cond
@@ -19,14 +19,14 @@ type BasicSleepyUintptr struct {
 	batcher Batcher
 }
 
-type basicSleepyUintptrNode struct {
-	next     uintptr // *basicSleepyUintptrNode
+type basicParkingUintptrNode struct {
+	next     uintptr // *basicParkingUintptrNode
 	argument interface{}
 }
 
-// NewBasicSleepyUintptr creates a BasicSleepyUintptr queue.
-func NewBasicSleepyUintptr(batcher Batcher) *BasicSleepyUintptr {
-	c := &BasicSleepyUintptr{
+// NewBasicParkingUintptr creates a BasicParkingUintptr queue.
+func NewBasicParkingUintptr(batcher Batcher) *BasicParkingUintptr {
+	c := &BasicParkingUintptr{
 		batcher: batcher,
 		head:    0,
 	}
@@ -34,16 +34,16 @@ func NewBasicSleepyUintptr(batcher Batcher) *BasicSleepyUintptr {
 	return c
 }
 
-const basicSleepyUintptrLocked = uintptr(1)
+const basicParkingUintptrLocked = uintptr(1)
 
 // Do passes value to Batcher and waits for completion
-func (c *BasicSleepyUintptr) Do(op interface{}) {
-	node := &basicSleepyUintptrNode{argument: op}
+func (c *BasicParkingUintptr) Do(op interface{}) {
+	node := &basicParkingUintptrNode{argument: op}
 
 	var cmp uintptr
 	for {
 		cmp = atomic.LoadUintptr(&c.head)
-		xchg := basicSleepyUintptrLocked
+		xchg := basicParkingUintptrLocked
 		if cmp != 0 {
 			// There is already a combiner, enqueue itself.
 			xchg = uintptr(unsafe.Pointer(node))
@@ -80,8 +80,8 @@ func (c *BasicSleepyUintptr) Do(op interface{}) {
 				// grab the list and replace with LOCKED.
 				// Otherwise, exchange to nil.
 				var xchg uintptr = 0
-				if cmp != basicSleepyUintptrLocked {
-					xchg = basicSleepyUintptrLocked
+				if cmp != basicParkingUintptrLocked {
+					xchg = basicParkingUintptrLocked
 				}
 
 				if atomic.CompareAndSwapUintptr(&c.head, cmp, xchg) {
@@ -90,13 +90,13 @@ func (c *BasicSleepyUintptr) Do(op interface{}) {
 			}
 
 			// No more operations to combine, return.
-			if cmp == basicSleepyUintptrLocked {
+			if cmp == basicParkingUintptrLocked {
 				break
 			}
 
 			// Execute the list of operations.
-			for cmp != basicSleepyUintptrLocked {
-				node = (*basicSleepyUintptrNode)(unsafe.Pointer(cmp))
+			for cmp != basicParkingUintptrLocked {
+				node = (*basicParkingUintptrNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
 				c.batcher.Include(node.argument)

@@ -7,11 +7,11 @@ import (
 	"unsafe"
 )
 
-// BasicSleepy is an unbounded non-spinning combiner queue
+// BasicParking is an unbounded non-spinning combiner queue
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type BasicSleepy struct {
-	head    unsafe.Pointer // *basicSleepyNode
+type BasicParking struct {
+	head    unsafe.Pointer // *basicParkingNode
 	_       [7]uint64
 	lock    sync.Mutex
 	cond    sync.Cond
@@ -19,14 +19,14 @@ type BasicSleepy struct {
 	batcher Batcher
 }
 
-type basicSleepyNode struct {
+type basicParkingNode struct {
 	argument interface{}
-	next     unsafe.Pointer // *basicSleepyNode
+	next     unsafe.Pointer // *basicParkingNode
 }
 
-// NewBasicSleepy creates a BasicSleepy queue.
-func NewBasicSleepy(batcher Batcher) *BasicSleepy {
-	c := &BasicSleepy{
+// NewBasicParking creates a BasicParking queue.
+func NewBasicParking(batcher Batcher) *BasicParking {
+	c := &BasicParking{
 		batcher: batcher,
 		head:    nil,
 	}
@@ -34,23 +34,23 @@ func NewBasicSleepy(batcher Batcher) *BasicSleepy {
 	return c
 }
 
-var basicSleepyLockedElem = basicSleepyNode{}
-var basicSleepyLockedNode = &basicSleepyLockedElem
-var basicSleepyLocked = (unsafe.Pointer)(basicSleepyLockedNode)
+var basicParkingLockedElem = basicParkingNode{}
+var basicParkingLockedNode = &basicParkingLockedElem
+var basicParkingLocked = (unsafe.Pointer)(basicParkingLockedNode)
 
 // DoAsync passes value to Batcher without waiting for completion
-func (c *BasicSleepy) DoAsync(op interface{}) { c.do(op, true) }
+func (c *BasicParking) DoAsync(op interface{}) { c.do(op, true) }
 
 // Do passes value to Batcher and waits for completion
-func (c *BasicSleepy) Do(op interface{}) { c.do(op, false) }
+func (c *BasicParking) Do(op interface{}) { c.do(op, false) }
 
-func (c *BasicSleepy) do(op interface{}, async bool) {
-	node := &basicSleepyNode{argument: op}
+func (c *BasicParking) do(op interface{}, async bool) {
+	node := &basicParkingNode{argument: op}
 
 	var cmp unsafe.Pointer
 	for {
 		cmp = atomic.LoadPointer(&c.head)
-		xchg := basicSleepyLocked
+		xchg := basicParkingLocked
 		if cmp != nil {
 			// There is already a combiner, enqueue itself.
 			xchg = (unsafe.Pointer)(node)
@@ -87,8 +87,8 @@ func (c *BasicSleepy) do(op interface{}, async bool) {
 			for {
 				cmp = atomic.LoadPointer(&c.head)
 				var xchg unsafe.Pointer
-				if cmp != basicSleepyLocked {
-					xchg = basicSleepyLocked
+				if cmp != basicParkingLocked {
+					xchg = basicParkingLocked
 				}
 
 				if atomic.CompareAndSwapPointer(&c.head, cmp, xchg) {
@@ -96,12 +96,12 @@ func (c *BasicSleepy) do(op interface{}, async bool) {
 				}
 			}
 
-			if cmp == basicSleepyLocked {
+			if cmp == basicParkingLocked {
 				break
 			}
 
-			for cmp != basicSleepyLocked {
-				node = (*basicSleepyNode)(unsafe.Pointer(cmp))
+			for cmp != basicParkingLocked {
+				node = (*basicParkingNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
 				c.batcher.Include(node.argument)

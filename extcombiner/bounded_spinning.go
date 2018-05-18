@@ -1,53 +1,47 @@
 package extcombiner
 
 import (
-	"sync"
 	"sync/atomic"
 	"unsafe"
 )
 
-// BoundedSleepy is a bounded non-spinning combiner queue
+// BoundedSpinning is a bounded spinning combiner queue
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type BoundedSleepy struct {
-	head    unsafe.Pointer // *boundedSleepyNode
+type BoundedSpinning struct {
+	head    unsafe.Pointer // *boundedSpinningNode
 	_       [7]uint64
-	lock    sync.Mutex
-	cond    sync.Cond
-	_       [0]uint64
 	batcher Batcher
 	limit   int
 }
 
-type boundedSleepyNode struct {
-	next     unsafe.Pointer // *boundedSleepyNode
+type boundedSpinningNode struct {
+	next     unsafe.Pointer // *boundedSpinningNode
 	handoff  int64
 	argument interface{}
 }
 
-// NewBoundedSleepy creates a BoundedSleepy queue.
-func NewBoundedSleepy(batcher Batcher, limit int) *BoundedSleepy {
-	c := &BoundedSleepy{
+// NewBoundedSpinning creates a BoundedSpinning queue.
+func NewBoundedSpinning(batcher Batcher, limit int) *BoundedSpinning {
+	return &BoundedSpinning{
 		batcher: batcher,
 		limit:   limit,
 		head:    nil,
 	}
-	c.cond.L = &c.lock
-	return c
 }
 
-var boundedSleepyLockedElem = boundedSleepyNode{}
-var boundedSleepyLockedNode = &boundedSleepyLockedElem
-var boundedSleepyLocked = (unsafe.Pointer)(boundedSleepyLockedNode)
+var boundedSpinningLockedElem = boundedSpinningNode{}
+var boundedSpinningLockedNode = &boundedSpinningLockedElem
+var boundedSpinningLocked = (unsafe.Pointer)(boundedSpinningLockedNode)
 
 // Do passes value to Batcher and waits for completion
-func (c *BoundedSleepy) Do(arg interface{}) {
-	node := &boundedSleepyNode{argument: arg}
+func (c *BoundedSpinning) Do(arg interface{}) {
+	node := &boundedSpinningNode{argument: arg}
 
 	var cmp unsafe.Pointer
 	for {
 		cmp = atomic.LoadPointer(&c.head)
-		xchg := boundedSleepyLocked
+		xchg := boundedSpinningLocked
 		if cmp != nil {
 			// There is already a combiner, enqueue itself.
 			xchg = (unsafe.Pointer)(node)
@@ -63,27 +57,25 @@ func (c *BoundedSleepy) Do(arg interface{}) {
 	if cmp != nil {
 		// 2. If we are not the combiner, wait for arg.next to become nil
 		// (which means the operation is finished).
-		c.lock.Lock()
-		for {
+		for try := 0; ; spin(&try) {
 			next := atomic.LoadPointer(&node.next)
 			if next == nil {
-				c.lock.Unlock()
 				return
 			}
+
 			if atomic.LoadInt64(&node.handoff) == 1 {
 				// start combining from the current position
 				handoff = true
 				break
 			}
-			c.cond.Wait()
 		}
-		c.lock.Unlock()
 	}
 
 	// 3. We are the combiner.
 
 	// First, execute own operation.
 	c.batcher.Start()
+	defer c.batcher.Finish()
 
 	var count int
 	if !handoff {
@@ -91,17 +83,12 @@ func (c *BoundedSleepy) Do(arg interface{}) {
 		count++
 	} else {
 		// Execute the list of operations.
-		for node != boundedSleepyLockedNode {
+		for node != boundedSpinningLockedNode {
 			if count == c.limit {
 				atomic.StoreInt64(&node.handoff, 1)
-				c.batcher.Finish()
-
-				c.lock.Lock()
-				c.cond.Broadcast()
-				c.lock.Unlock()
 				return
 			}
-			next := (*boundedSleepyNode)(node.next)
+			next := (*boundedSpinningNode)(node.next)
 			c.batcher.Include(node.argument)
 			count++
 			// Mark completion.
@@ -118,8 +105,8 @@ func (c *BoundedSleepy) Do(arg interface{}) {
 			// grab the list and replace with LOCKED.
 			// Otherwise, exchange to nil.
 			var xchg unsafe.Pointer = nil
-			if cmp != boundedSleepyLocked {
-				xchg = boundedSleepyLocked
+			if cmp != boundedSpinningLocked {
+				xchg = boundedSpinningLocked
 			}
 			if atomic.CompareAndSwapPointer(&c.head, cmp, xchg) {
 				break
@@ -127,24 +114,19 @@ func (c *BoundedSleepy) Do(arg interface{}) {
 		}
 
 		// No more operations to combine, return.
-		if cmp == boundedSleepyLocked {
+		if cmp == boundedSpinningLocked {
 			break
 		}
 
-		node = (*boundedSleepyNode)(cmp)
+		node = (*boundedSpinningNode)(cmp)
 
 		// Execute the list of operations.
-		for node != boundedSleepyLockedNode {
+		for node != boundedSpinningLockedNode {
 			if count == c.limit {
 				atomic.StoreInt64(&node.handoff, 1)
-				c.batcher.Finish()
-
-				c.lock.Lock()
-				c.cond.Broadcast()
-				c.lock.Unlock()
 				return
 			}
-			next := (*boundedSleepyNode)(node.next)
+			next := (*boundedSpinningNode)(node.next)
 			c.batcher.Include(node.argument)
 			count++
 			// Mark completion.
@@ -152,10 +134,4 @@ func (c *BoundedSleepy) Do(arg interface{}) {
 			node = next
 		}
 	}
-
-	c.batcher.Finish()
-
-	c.lock.Lock()
-	c.cond.Broadcast()
-	c.lock.Unlock()
 }

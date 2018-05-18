@@ -1,47 +1,53 @@
 package extcombiner
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
 
-// Bounded is a bounded non-spinning combiner queue
+// BoundedParking is a bounded non-spinning combiner queue
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type Bounded struct {
-	head    unsafe.Pointer // *boundedNode
+type BoundedParking struct {
+	head    unsafe.Pointer // *boundedParkingNode
 	_       [7]uint64
+	lock    sync.Mutex
+	cond    sync.Cond
+	_       [0]uint64
 	batcher Batcher
 	limit   int
 }
 
-type boundedNode struct {
-	next     unsafe.Pointer // *boundedNode
+type boundedParkingNode struct {
+	next     unsafe.Pointer // *boundedParkingNode
 	handoff  int64
 	argument interface{}
 }
 
-// NewBounded creates a Bounded queue.
-func NewBounded(batcher Batcher, limit int) *Bounded {
-	return &Bounded{
+// NewBoundedParking creates a BoundedParking queue.
+func NewBoundedParking(batcher Batcher, limit int) *BoundedParking {
+	c := &BoundedParking{
 		batcher: batcher,
 		limit:   limit,
 		head:    nil,
 	}
+	c.cond.L = &c.lock
+	return c
 }
 
-var boundedLockedElem = boundedNode{}
-var boundedLockedNode = &boundedLockedElem
-var boundedLocked = (unsafe.Pointer)(boundedLockedNode)
+var boundedParkingLockedElem = boundedParkingNode{}
+var boundedParkingLockedNode = &boundedParkingLockedElem
+var boundedParkingLocked = (unsafe.Pointer)(boundedParkingLockedNode)
 
 // Do passes value to Batcher and waits for completion
-func (c *Bounded) Do(arg interface{}) {
-	node := &boundedNode{argument: arg}
+func (c *BoundedParking) Do(arg interface{}) {
+	node := &boundedParkingNode{argument: arg}
 
 	var cmp unsafe.Pointer
 	for {
 		cmp = atomic.LoadPointer(&c.head)
-		xchg := boundedLocked
+		xchg := boundedParkingLocked
 		if cmp != nil {
 			// There is already a combiner, enqueue itself.
 			xchg = (unsafe.Pointer)(node)
@@ -57,25 +63,27 @@ func (c *Bounded) Do(arg interface{}) {
 	if cmp != nil {
 		// 2. If we are not the combiner, wait for arg.next to become nil
 		// (which means the operation is finished).
-		for try := 0; ; spin(&try) {
+		c.lock.Lock()
+		for {
 			next := atomic.LoadPointer(&node.next)
 			if next == nil {
+				c.lock.Unlock()
 				return
 			}
-
 			if atomic.LoadInt64(&node.handoff) == 1 {
 				// start combining from the current position
 				handoff = true
 				break
 			}
+			c.cond.Wait()
 		}
+		c.lock.Unlock()
 	}
 
 	// 3. We are the combiner.
 
 	// First, execute own operation.
 	c.batcher.Start()
-	defer c.batcher.Finish()
 
 	var count int
 	if !handoff {
@@ -83,12 +91,17 @@ func (c *Bounded) Do(arg interface{}) {
 		count++
 	} else {
 		// Execute the list of operations.
-		for node != boundedLockedNode {
+		for node != boundedParkingLockedNode {
 			if count == c.limit {
 				atomic.StoreInt64(&node.handoff, 1)
+				c.batcher.Finish()
+
+				c.lock.Lock()
+				c.cond.Broadcast()
+				c.lock.Unlock()
 				return
 			}
-			next := (*boundedNode)(node.next)
+			next := (*boundedParkingNode)(node.next)
 			c.batcher.Include(node.argument)
 			count++
 			// Mark completion.
@@ -105,8 +118,8 @@ func (c *Bounded) Do(arg interface{}) {
 			// grab the list and replace with LOCKED.
 			// Otherwise, exchange to nil.
 			var xchg unsafe.Pointer = nil
-			if cmp != boundedLocked {
-				xchg = boundedLocked
+			if cmp != boundedParkingLocked {
+				xchg = boundedParkingLocked
 			}
 			if atomic.CompareAndSwapPointer(&c.head, cmp, xchg) {
 				break
@@ -114,19 +127,24 @@ func (c *Bounded) Do(arg interface{}) {
 		}
 
 		// No more operations to combine, return.
-		if cmp == boundedLocked {
+		if cmp == boundedParkingLocked {
 			break
 		}
 
-		node = (*boundedNode)(cmp)
+		node = (*boundedParkingNode)(cmp)
 
 		// Execute the list of operations.
-		for node != boundedLockedNode {
+		for node != boundedParkingLockedNode {
 			if count == c.limit {
 				atomic.StoreInt64(&node.handoff, 1)
+				c.batcher.Finish()
+
+				c.lock.Lock()
+				c.cond.Broadcast()
+				c.lock.Unlock()
 				return
 			}
-			next := (*boundedNode)(node.next)
+			next := (*boundedParkingNode)(node.next)
 			c.batcher.Include(node.argument)
 			count++
 			// Mark completion.
@@ -134,4 +152,10 @@ func (c *Bounded) Do(arg interface{}) {
 			node = next
 		}
 	}
+
+	c.batcher.Finish()
+
+	c.lock.Lock()
+	c.cond.Broadcast()
+	c.lock.Unlock()
 }

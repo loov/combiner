@@ -6,11 +6,11 @@ import (
 	"unsafe"
 )
 
-// BoundedSleepyUintptr is a bounded non-spinning combiner queue using uintptr internally
+// BoundedParkingUintptr is a bounded non-spinning combiner queue using uintptr internally
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type BoundedSleepyUintptr struct {
-	head    uintptr // *boundedSleepyUintptrNode
+type BoundedParkingUintptr struct {
+	head    uintptr // *boundedParkingUintptrNode
 	_       [7]uint64
 	lock    sync.Mutex
 	cond    sync.Cond
@@ -19,14 +19,14 @@ type BoundedSleepyUintptr struct {
 	limit   int
 }
 
-type boundedSleepyUintptrNode struct {
-	next     uintptr // *boundedSleepyUintptrNode
+type boundedParkingUintptrNode struct {
+	next     uintptr // *boundedParkingUintptrNode
 	argument interface{}
 }
 
-// NewBoundedSleepyUintptr creates a BoundedSleepyUintptr queue.
-func NewBoundedSleepyUintptr(batcher Batcher, limit int) *BoundedSleepyUintptr {
-	c := &BoundedSleepyUintptr{
+// NewBoundedParkingUintptr creates a BoundedParkingUintptr queue.
+func NewBoundedParkingUintptr(batcher Batcher, limit int) *BoundedParkingUintptr {
+	c := &BoundedParkingUintptr{
 		batcher: batcher,
 		limit:   limit,
 		head:    0,
@@ -36,18 +36,18 @@ func NewBoundedSleepyUintptr(batcher Batcher, limit int) *BoundedSleepyUintptr {
 }
 
 const (
-	boundedSleepyUintptrLocked     = uintptr(1)
-	boundedSleepyUintptrHandoffTag = uintptr(2)
+	boundedParkingUintptrLocked     = uintptr(1)
+	boundedParkingUintptrHandoffTag = uintptr(2)
 )
 
 // Do passes value to Batcher and waits for completion
-func (c *BoundedSleepyUintptr) Do(arg interface{}) {
-	node := &boundedSleepyUintptrNode{argument: arg}
+func (c *BoundedParkingUintptr) Do(arg interface{}) {
+	node := &boundedParkingUintptrNode{argument: arg}
 
 	var cmp uintptr
 	for {
 		cmp = atomic.LoadUintptr(&c.head)
-		xchg := boundedSleepyUintptrLocked
+		xchg := boundedParkingUintptrLocked
 		if cmp != 0 {
 			// There is already a combiner, enqueue itself.
 			xchg = uintptr(unsafe.Pointer(node))
@@ -72,8 +72,8 @@ func (c *BoundedSleepyUintptr) Do(arg interface{}) {
 				return
 			}
 
-			if next&boundedSleepyUintptrHandoffTag != 0 {
-				node.next &^= boundedSleepyUintptrHandoffTag
+			if next&boundedParkingUintptrHandoffTag != 0 {
+				node.next &^= boundedParkingUintptrHandoffTag
 				// DO COMBINING
 				handoff = true
 				break
@@ -103,8 +103,8 @@ func (c *BoundedSleepyUintptr) Do(arg interface{}) {
 			// grab the list and replace with LOCKED.
 			// Otherwise, exchange to nil.
 			var xchg uintptr = 0
-			if cmp != boundedSleepyUintptrLocked {
-				xchg = boundedSleepyUintptrLocked
+			if cmp != boundedParkingUintptrLocked {
+				xchg = boundedParkingUintptrLocked
 			}
 
 			if atomic.CompareAndSwapUintptr(&c.head, cmp, xchg) {
@@ -113,16 +113,16 @@ func (c *BoundedSleepyUintptr) Do(arg interface{}) {
 		}
 
 		// No more operations to combine, return.
-		if cmp == boundedSleepyUintptrLocked {
+		if cmp == boundedParkingUintptrLocked {
 			break
 		}
 
 	combiner:
 		// Execute the list of operations.
-		for cmp != boundedSleepyUintptrLocked {
-			node = (*boundedSleepyUintptrNode)(unsafe.Pointer(cmp))
+		for cmp != boundedParkingUintptrLocked {
+			node = (*boundedParkingUintptrNode)(unsafe.Pointer(cmp))
 			if count == c.limit {
-				atomic.StoreUintptr(&node.next, node.next|boundedSleepyUintptrHandoffTag)
+				atomic.StoreUintptr(&node.next, node.next|boundedParkingUintptrHandoffTag)
 				c.batcher.Finish()
 
 				c.lock.Lock()

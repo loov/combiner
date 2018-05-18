@@ -5,24 +5,24 @@ import (
 	"unsafe"
 )
 
-// BoundedUintptr is a bounded spinning combiner queue using uintptr internally
+// BoundedSpinningUintptr is a bounded spinning combiner queue using uintptr internally
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type BoundedUintptr struct {
-	head    uintptr // *boundedUintptrNode
+type BoundedSpinningUintptr struct {
+	head    uintptr // *boundedSpinningUintptrNode
 	_       [7]uint64
 	batcher Batcher
 	limit   int
 }
 
-type boundedUintptrNode struct {
-	next     uintptr // *boundedUintptrNode
+type boundedSpinningUintptrNode struct {
+	next     uintptr // *boundedSpinningUintptrNode
 	argument interface{}
 }
 
-// NewBoundedUintptr creates a BoundedUintptr queue.
-func NewBoundedUintptr(batcher Batcher, limit int) *BoundedUintptr {
-	return &BoundedUintptr{
+// NewBoundedSpinningUintptr creates a BoundedSpinningUintptr queue.
+func NewBoundedSpinningUintptr(batcher Batcher, limit int) *BoundedSpinningUintptr {
+	return &BoundedSpinningUintptr{
 		batcher: batcher,
 		limit:   limit,
 		head:    0,
@@ -30,18 +30,18 @@ func NewBoundedUintptr(batcher Batcher, limit int) *BoundedUintptr {
 }
 
 const (
-	boundedUintptrLocked     = uintptr(1)
-	boundedUintptrHandoffTag = uintptr(2)
+	boundedSpinningUintptrLocked     = uintptr(1)
+	boundedSpinningUintptrHandoffTag = uintptr(2)
 )
 
 // Do passes value to Batcher and waits for completion
-func (c *BoundedUintptr) Do(arg interface{}) {
-	node := &boundedUintptrNode{argument: arg}
+func (c *BoundedSpinningUintptr) Do(arg interface{}) {
+	node := &boundedSpinningUintptrNode{argument: arg}
 
 	var cmp uintptr
 	for {
 		cmp = atomic.LoadUintptr(&c.head)
-		xchg := boundedUintptrLocked
+		xchg := boundedSpinningUintptrLocked
 		if cmp != 0 {
 			// There is already a combiner, enqueue itself.
 			xchg = uintptr(unsafe.Pointer(node))
@@ -64,8 +64,8 @@ func (c *BoundedUintptr) Do(arg interface{}) {
 				return
 			}
 
-			if next&boundedUintptrHandoffTag != 0 {
-				node.next &^= boundedUintptrHandoffTag
+			if next&boundedSpinningUintptrHandoffTag != 0 {
+				node.next &^= boundedSpinningUintptrHandoffTag
 				// DO COMBINING
 				handoff = true
 				break
@@ -94,8 +94,8 @@ func (c *BoundedUintptr) Do(arg interface{}) {
 			// grab the list and replace with LOCKED.
 			// Otherwise, exchange to nil.
 			var xchg uintptr = 0
-			if cmp != boundedUintptrLocked {
-				xchg = boundedUintptrLocked
+			if cmp != boundedSpinningUintptrLocked {
+				xchg = boundedSpinningUintptrLocked
 			}
 
 			if atomic.CompareAndSwapUintptr(&c.head, cmp, xchg) {
@@ -104,16 +104,16 @@ func (c *BoundedUintptr) Do(arg interface{}) {
 		}
 
 		// No more operations to combine, return.
-		if cmp == boundedUintptrLocked {
+		if cmp == boundedSpinningUintptrLocked {
 			break
 		}
 
 	combiner:
 		// Execute the list of operations.
-		for cmp != boundedUintptrLocked {
-			node = (*boundedUintptrNode)(unsafe.Pointer(cmp))
+		for cmp != boundedSpinningUintptrLocked {
+			node = (*boundedSpinningUintptrNode)(unsafe.Pointer(cmp))
 			if count == c.limit {
-				atomic.StoreUintptr(&node.next, node.next|boundedUintptrHandoffTag)
+				atomic.StoreUintptr(&node.next, node.next|boundedSpinningUintptrHandoffTag)
 				return
 			}
 			cmp = node.next

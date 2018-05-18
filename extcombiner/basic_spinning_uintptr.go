@@ -5,45 +5,38 @@ import (
 	"unsafe"
 )
 
-// Basic is an unbounded spinning combiner queue
+// BasicSpinningUintptr is an unbounded spinning combiner queue using uintptr internally
 //
 // Based on https://software.intel.com/en-us/blogs/2013/02/22/combineraggregator-synchronization-primitive
-type Basic struct {
-	head    unsafe.Pointer // *basicNode
+type BasicSpinningUintptr struct {
+	head    uintptr // *basicSpinningUintptrNode
 	_       [7]uint64
 	batcher Batcher
 }
 
-type basicNode struct {
-	next     unsafe.Pointer // *basicNode
+type basicSpinningUintptrNode struct {
+	next     uintptr // *basicSpinningUintptrNode
 	argument interface{}
 }
 
-// NewBasic creates a Basic queue.
-func NewBasic(batcher Batcher) *Basic {
-	return &Basic{
+// NewBasicSpinningUintptr creates a BasicSpinningUintptr queue.
+func NewBasicSpinningUintptr(batcher Batcher) *BasicSpinningUintptr {
+	return &BasicSpinningUintptr{
 		batcher: batcher,
-		head:    nil,
+		head:    0,
 	}
 }
 
-var basicLockedElem = basicNode{}
-var basicLockedNode = &basicLockedElem
-var basicLocked = (unsafe.Pointer)(basicLockedNode)
-
-// DoAsync passes value to Batcher without waiting for completion
-func (c *Basic) DoAsync(op interface{}) { c.do(op, true) }
+const basicSpinningUintptrLocked = uintptr(1)
 
 // Do passes value to Batcher and waits for completion
-func (c *Basic) Do(op interface{}) { c.do(op, false) }
-
-func (c *Basic) do(op interface{}, async bool) {
-	node := &basicNode{argument: op}
+func (c *BasicSpinningUintptr) Do(op interface{}) {
+	node := &basicSpinningUintptrNode{argument: op}
 
 	// c.head can be in 3 states:
 	// c.head == 0: no operations in-flight, initial state.
 	// c.head == LOCKED: single operation in-flight, no combining opportunities.
-	// c.head == pointer to some basicNode that is subject to combining.
+	// c.head == pointer to some basicSpinningUintptrNode that is subject to combining.
 	//            The args are chainded into a lock-free list via 'next' fields.
 	// node.next also can be in 3 states:
 	// node.next == pointer to other node.
@@ -54,29 +47,25 @@ func (c *Basic) do(op interface{}, async bool) {
 	// 1. If c.head == nil, exchange it to LOCKED and become the combiner.
 	// Otherwise, enqueue own node into the c->head lock-free list.
 
-	var cmp unsafe.Pointer
+	var cmp uintptr
 	for {
-		cmp = atomic.LoadPointer(&c.head)
-		xchg := basicLocked
-		if cmp != nil {
+		cmp = atomic.LoadUintptr(&c.head)
+		xchg := basicSpinningUintptrLocked
+		if cmp != 0 {
 			// There is already a combiner, enqueue itself.
-			xchg = (unsafe.Pointer)(node)
+			xchg = uintptr(unsafe.Pointer(node))
 			node.next = cmp
 		}
 
-		if atomic.CompareAndSwapPointer(&c.head, cmp, xchg) {
+		if atomic.CompareAndSwapUintptr(&c.head, cmp, xchg) {
 			break
 		}
 	}
 
-	if cmp != nil {
-		if async {
-			return
-		}
-
+	if cmp != 0 {
 		// 2. If we are not the combiner, wait for node.next to become nil
 		// (which means the operation is finished).
-		for try := 0; atomic.LoadPointer(&node.next) != nil; spin(&try) {
+		for try := 0; atomic.LoadUintptr(&node.next) != 0; spin(&try) {
 		}
 	} else {
 		// 3. We are the combiner.
@@ -90,33 +79,33 @@ func (c *Basic) do(op interface{}, async bool) {
 		// Then, look for combining opportunities.
 		for {
 			for {
-				cmp = atomic.LoadPointer(&c.head)
+				cmp = atomic.LoadUintptr(&c.head)
 				// If there are some operations in the list,
 				// grab the list and replace with LOCKED.
 				// Otherwise, exchange to nil.
-				var xchg unsafe.Pointer
-				if cmp != basicLocked {
-					xchg = basicLocked
+				var xchg uintptr = 0
+				if cmp != basicSpinningUintptrLocked {
+					xchg = basicSpinningUintptrLocked
 				}
 
-				if atomic.CompareAndSwapPointer(&c.head, cmp, xchg) {
+				if atomic.CompareAndSwapUintptr(&c.head, cmp, xchg) {
 					break
 				}
 			}
 
 			// No more operations to combine, return.
-			if cmp == basicLocked {
+			if cmp == basicSpinningUintptrLocked {
 				break
 			}
 
 			// Execute the list of operations.
-			for cmp != basicLocked {
-				node = (*basicNode)(unsafe.Pointer(cmp))
+			for cmp != basicSpinningUintptrLocked {
+				node = (*basicSpinningUintptrNode)(unsafe.Pointer(cmp))
 				cmp = node.next
 
 				c.batcher.Include(node.argument)
 				// Mark completion.
-				atomic.StorePointer(&node.next, nil)
+				atomic.StoreUintptr(&node.next, 0)
 			}
 		}
 	}
