@@ -1,6 +1,8 @@
 package combiner
 
 // Batcher is the operation combining implementation.
+//
+// Batcher must not panic.
 type Batcher interface {
 	// Start is called on a start of a new batch.
 	Start()
