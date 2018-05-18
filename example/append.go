@@ -18,6 +18,44 @@ const (
 	N = 100
 )
 
+func main() {
+	f, _ := os.Create("temp.dat~")
+	f.Truncate(P * N)
+
+	f.Seek(0, os.SEEK_SET)
+	fmt.Println("CombiningFile", Bench(NewCombiningFile(f)))
+
+	f.Seek(0, os.SEEK_SET)
+	fmt.Println("MutexFile", Bench(NewMutexFile(f)))
+
+	// Output:
+	// CombiningFile 163.661342ms
+	// MutexFile 11.084999209s
+}
+
+type Writer interface {
+	WriteByte(byte byte)
+}
+
+func Bench(w Writer) time.Duration {
+	start := hrtime.TSC()
+
+	var wg sync.WaitGroup
+	wg.Add(P)
+	for i := 0; i < P; i++ {
+		go func(pid int) {
+			for i := 0; i < N; i++ {
+				w.WriteByte(byte(i))
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	stop := hrtime.TSC()
+	return (stop - start).ApproxDuration()
+}
+
 type CombiningFile struct {
 	add  combiner.Parking
 	file *os.File
@@ -53,42 +91,4 @@ func (m *MutexFile) WriteByte(b byte) {
 	m.file.Write([]byte{b})
 	m.file.Sync()
 	m.mu.Unlock()
-}
-
-type Writer interface {
-	WriteByte(byte byte)
-}
-
-func main() {
-	f, _ := os.Create("temp.dat~")
-	f.Truncate(P * N)
-
-	f.Seek(0, os.SEEK_SET)
-	fmt.Println("CombiningFile", Bench(NewCombiningFile(f)))
-
-	f.Seek(0, os.SEEK_SET)
-	fmt.Println("MutexFile", Bench(NewMutexFile(f)))
-
-	// Output:
-	// CombiningFile 163.661342ms
-	// MutexFile 11.084999209s
-}
-
-func Bench(w Writer) time.Duration {
-	start := hrtime.TSC()
-
-	var wg sync.WaitGroup
-	wg.Add(P)
-	for i := 0; i < P; i++ {
-		go func(pid int) {
-			for i := 0; i < N; i++ {
-				w.WriteByte(byte(i))
-			}
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
-
-	stop := hrtime.TSC()
-	return (stop - start).ApproxDuration()
 }
