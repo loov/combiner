@@ -91,7 +91,7 @@ func (q *Spinning) Do(arg interface{}) {
 
 combining:
 	q.batcher.Start()
-	q.batcher.Include(my.argument)
+	q.batcher.Do(my.argument)
 	count := int64(1)
 
 	if handoff {
@@ -128,7 +128,7 @@ combine:
 		}
 		cmp = other.next
 
-		q.batcher.Include(other.argument)
+		q.batcher.Do(other.argument)
 		count++
 		// Mark completion.
 		atomicStoreNodeptr(&other.next, 0)
