@@ -27,8 +27,8 @@ func NewParking(batcher Batcher, limit int) *Parking {
 	return q
 }
 
-// Init initializes a Spinning combiner.
-// Note: NewSpinning does this automatically.
+// Init initializes a Parking combiner.
+// Note: NewParking does this automatically.
 func (q *Parking) Init(batcher Batcher, limit int) {
 	if limit < 0 {
 		panic("combiner limit must be positive")
