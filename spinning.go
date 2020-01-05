@@ -12,6 +12,9 @@ import (
 //
 // If very high performance is required benchmark replacing Batcher
 // and argument with concrete implementation.
+//
+// Deprecated: This may cause problems with OS or runtime scheduler.
+// Use Parking implementation instead.
 type Spinning struct {
 	limit   int64
 	batcher Batcher
