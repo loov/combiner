@@ -34,6 +34,9 @@ func BenchmarkLockNopUncontended(b *testing.B) {
 	var mu sync.Mutex
 	for i := 0; i < b.N; i++ {
 		mu.Lock()
+		{
+			// intentionally empty section
+		}
 		mu.Unlock()
 	}
 }
@@ -43,6 +46,9 @@ func BenchmarkLockNopContended(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			mu.Lock()
+			{
+				// intentionally empty section
+			}
 			mu.Unlock()
 		}
 	})
