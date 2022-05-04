@@ -9,16 +9,10 @@ import (
 // All contains all combiner queue descriptions
 var All = testsuite.Descs{
 	{
-		Name:    "Spinning",
-		Bounded: true,
-		Create: func(bat testsuite.Batcher, bound int) testsuite.Combiner {
-			return NewSpinning(bat, bound)
-		},
-	}, {
 		Name:    "Parking",
 		Bounded: true,
 		Create: func(bat testsuite.Batcher, bound int) testsuite.Combiner {
-			return NewParking(bat, bound)
+			return New[interface{}](bat, bound)
 		},
 	},
 }

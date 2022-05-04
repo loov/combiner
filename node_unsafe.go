@@ -7,12 +7,12 @@ import (
 
 type nodeptr = uintptr
 
-type node struct {
+type node[T any] struct {
 	next     nodeptr // *next
-	argument interface{}
+	argument T
 }
 
-func (n *node) ref() nodeptr { return (nodeptr)(unsafe.Pointer(n)) }
+func (n *node[T]) ref() nodeptr { return (nodeptr)(unsafe.Pointer(n)) }
 
 const (
 	locked     = nodeptr(1)
@@ -30,4 +30,4 @@ func atomicCompareAndSwapNodeptr(addr *uintptr, old, new uintptr) bool {
 	return atomic.CompareAndSwapUintptr(addr, old, new)
 }
 
-func nodeptrToNode(p nodeptr) *node { return (*node)(unsafe.Pointer(p)) }
+func nodeptrToNode[T any](p nodeptr) *node[T] { return (*node[T])(unsafe.Pointer(p)) }

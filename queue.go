@@ -5,14 +5,26 @@ import (
 	"sync"
 )
 
-// Parking is a bounded non-spinning combiner queue.
+// Batcher is the operation combining implementation.
+//
+// Batcher must not panic.
+type Batcher[T any] interface {
+	// Start is called on a start of a new batch.
+	Start()
+	// Do is called for each batch element.
+	Do(T)
+	// Finish is called after completing a batch.
+	Finish()
+}
+
+// Queue is a bounded non-spinning combiner queue.
 //
 // This implementation is useful when the batcher work is large
 // ore there are many goroutines concurrently calling Do. A good example
 // would be a appending to a file.
-type Parking struct {
+type Queue[T any] struct {
 	limit   int64
-	batcher Batcher
+	batcher Batcher[T]
 	_       [5]int64
 	head    nodeptr
 	_       [7]int64
@@ -20,16 +32,16 @@ type Parking struct {
 	cond    sync.Cond
 }
 
-// NewParking creates a Parking combiner queue
-func NewParking(batcher Batcher, limit int) *Parking {
-	q := &Parking{}
+// New creates a new combiner queue
+func New[T any](batcher Batcher[T], limit int) *Queue[T] {
+	q := &Queue[T]{}
 	q.Init(batcher, limit)
 	return q
 }
 
-// Init initializes a Parking combiner.
-// Note: NewParking does this automatically.
-func (q *Parking) Init(batcher Batcher, limit int) {
+// Init initializes a Queue combiner.
+// Note: New does this automatically.
+func (q *Queue[T]) Init(batcher Batcher[T], limit int) {
 	if limit < 0 {
 		panic("combiner limit must be positive")
 	}
@@ -42,8 +54,8 @@ func (q *Parking) Init(batcher Batcher, limit int) {
 // Do passes value to Batcher and waits for completion
 //go:nosplit
 //go:noinline
-func (q *Parking) Do(arg interface{}) {
-	var mynode node
+func (q *Queue[T]) Do(arg T) {
+	var mynode node[T]
 	my := &mynode
 	my.argument = arg
 	defer runtime.KeepAlive(my)
@@ -129,7 +141,7 @@ combinecheck:
 combine:
 	// Execute the list of operations.
 	for cmp != locked {
-		other := nodeptrToNode(cmp)
+		other := nodeptrToNode[T](cmp)
 		if count == q.limit {
 			atomicStoreNodeptr(&other.next, other.next|handoffTag)
 
