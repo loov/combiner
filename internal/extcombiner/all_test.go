@@ -3,7 +3,7 @@ package extcombiner
 import (
 	"testing"
 
-	"github.com/loov/combiner/testsuite"
+	"loov.dev/combiner/internal/testsuite"
 )
 
 func Test(t *testing.T) {

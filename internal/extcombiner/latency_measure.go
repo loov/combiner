@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -13,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loov/combiner/extcombiner"
-	"github.com/loov/combiner/testsuite"
 	"github.com/loov/hrtime"
+	"loov.dev/combiner/internal/extcombiner"
+	"loov.dev/combiner/internal/testsuite"
 )
 
 func main() {

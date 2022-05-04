@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/loov/combiner"
+	"loov.dev/combiner"
 )
 
 type Nop struct{}

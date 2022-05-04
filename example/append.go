@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -9,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/loov/combiner"
 	"github.com/loov/hrtime"
+	"loov.dev/combiner"
 )
 
 const (

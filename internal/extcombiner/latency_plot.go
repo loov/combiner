@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -15,8 +16,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/loov/combiner/testsuite"
 	"github.com/loov/plot"
+	"loov.dev/internal/combiner/testsuite"
 )
 
 func main() {

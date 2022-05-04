@@ -1,6 +1,6 @@
 package extcombiner
 
-import "github.com/loov/combiner/testsuite"
+import "loov.dev/combiner/internal/testsuite"
 
 // All contains all combiner queue descriptions
 var All = testsuite.Descs{

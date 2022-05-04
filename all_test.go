@@ -3,7 +3,7 @@ package combiner
 import (
 	"testing"
 
-	"github.com/loov/combiner/testsuite"
+	"loov.dev/combiner/internal/testsuite"
 )
 
 // All contains all combiner queue descriptions
